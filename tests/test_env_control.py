@@ -889,6 +889,9 @@ def _make_modular_env(*, mobile_base=True):
 
 def test_servop_brainco_head_action_routes_by_component_in_policy_order():
     env, action = _make_modular_env()
+    action[7:13] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    action[20:26] = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+    expected_action = action.copy()
 
     assert env.step(action)
 
@@ -907,7 +910,7 @@ def test_servop_brainco_head_action_routes_by_component_in_policy_order():
         "lifter",
     ]
     action[:] = -1.0
-    np.testing.assert_array_equal(env.last_action, np.arange(31, dtype=np.float64))
+    np.testing.assert_array_equal(env.last_action, expected_action)
 
 
 def test_step_clamps_gripper_actions_without_mutating_model_output():
@@ -925,6 +928,30 @@ def test_step_clamps_gripper_actions_without_mutating_model_output():
     assert env.robot.grippers[-1] == (0.0, 100.0)
     expected_action = original.copy()
     expected_action[[7, 15]] = [0.0, 1.0]
+    np.testing.assert_array_equal(env.last_action, expected_action)
+
+
+def test_step_clamps_brainco2_fingers_to_physical_limits_without_mutating_model_output():
+    env, _ = _make_modular_env(mobile_base=False)
+    action = np.zeros(28, dtype=np.float64)
+    action[7:13] = [-0.2, 0.5, 2.0, 1.4137, 1.5, 0.7]
+    action[20:26] = [1.2, 2.0, -0.1, 0.4, 1.4137, 3.0]
+    original = action.copy()
+
+    assert env.step(action)
+
+    np.testing.assert_array_equal(action, original)
+    np.testing.assert_array_equal(
+        env.robot.end_effector_commands[-1][0],
+        [0.0, 0.5, 1.4137, 1.4137, 1.4137, 0.7],
+    )
+    np.testing.assert_array_equal(
+        env.robot.end_effector_commands[-1][1],
+        [1.0297, 1.5707, 0.0, 0.4, 1.4137, 1.4137],
+    )
+    expected_action = original.copy()
+    expected_action[7:13] = [0.0, 0.5, 1.4137, 1.4137, 1.4137, 0.7]
+    expected_action[20:26] = [1.0297, 1.5707, 0.0, 0.4, 1.4137, 1.4137]
     np.testing.assert_array_equal(env.last_action, expected_action)
 
 
@@ -976,6 +1003,8 @@ def test_step_rejects_nonfinite_action_before_any_robot_call(index, value):
 
 def test_28d_servop_brainco_head_action_routes_without_mobile_commands():
     env, action = _make_modular_env(mobile_base=False)
+    action[7:13] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    action[20:26] = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
 
     assert action.shape == (28,)
     assert env.step(action)

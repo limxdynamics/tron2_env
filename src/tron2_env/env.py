@@ -283,6 +283,11 @@ class Tron2Env:
         >>> action = np.zeros(config.physical_layout.dim)
         >>> env.step(action)
     """
+
+    _BRAINCO2_POSITION_LIMITS = np.array(
+        [1.0297, 1.5707, 1.4137, 1.4137, 1.4137, 1.4137],
+        dtype=np.float64,
+    )
     
     def __init__(self, config: Optional[EnvConfig] = None):
         """初始化环境
@@ -610,6 +615,18 @@ class Tron2Env:
                     component_slice = self.layout.component_slice(component)
                     action_array[component_slice] = np.clip(
                         action_array[component_slice], 0.0, 1.0
+                    )
+            elif self.layout.end_effector_name == "brainco2":
+                action_array = action_array.copy()
+                for component in (
+                    self.layout.left_end_effector_component,
+                    self.layout.right_end_effector_component,
+                ):
+                    component_slice = self.layout.component_slice(component)
+                    action_array[component_slice] = np.clip(
+                        action_array[component_slice],
+                        0.0,
+                        self._BRAINCO2_POSITION_LIMITS,
                     )
             components = self.layout.unpack(action_array)
             mobile_command = (
