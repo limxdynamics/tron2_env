@@ -12,18 +12,122 @@ primitives:
 
 No rate limiting, no interpolation, no publish loop — those live in
 ``tron2_env.motion.MotionController``. This keeps transports trivially
-testable (mock socket / fake SDK) and lets the same publish loop drive any
+testable (mock socket / fake transport) and lets the same publish loop drive any
 backend.
 
-Concrete implementation:
+Concrete implementations:
   * ``tron2_env.transport.websocket.WebsocketTransport`` — JSON over ws://...
 """
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Callable, Optional, Protocol, runtime_checkable
 
 import numpy as np
+
+
+@dataclass(frozen=True)
+class LegacyInitPermissions:
+    """Optional legacy WebSocket bring-up behavior outside pose initialization."""
+
+    limx_gripper_open: bool = True
+
+    def __post_init__(self) -> None:
+        if type(self.limx_gripper_open) is not bool:
+            raise TypeError("limx_gripper_open must be a bool")
+
+
+@runtime_checkable
+class ConnectionStateTransport(Protocol):
+    """Optional main-session readiness notifications for reconnecting transports."""
+
+    def register_connection_state_callback(
+        self,
+        callback: Callable[[bool, int], None],
+    ) -> None:
+        """Report ``(ready, generation)`` and future connection transitions."""
+
+    def unregister_connection_state_callback(self) -> None:
+        """Remove the previously registered callback."""
+
+
+@runtime_checkable
+class ArmHeadStateTransport(Protocol):
+    """Optional capability for independently sampled 16D arm/head state."""
+
+    def get_arm_head_state(
+        self,
+        timeout: float = 1.0,
+        max_age: Optional[float] = None,
+        expected_guid: Optional[str] = None,
+    ) -> dict:
+        """Return the latest arm/head state without waiting for a gripper."""
+
+
+@runtime_checkable
+class GripperStateTransport(Protocol):
+    """Optional capability for independently sampled two-gripper state."""
+
+    def get_gripper_state(
+        self,
+        timeout: float = 1.0,
+        max_age: Optional[float] = None,
+    ) -> dict:
+        """Return the latest normalized left/right gripper state."""
+
+
+@runtime_checkable
+class CartesianServoTransport(Protocol):
+    """Optional capability for Cartesian servo commands and pose feedback."""
+
+    def send_pose_cmd(self, left: np.ndarray, right: np.ndarray) -> None:
+        """Send paired poses as ``[x, y, z, qw, qx, qy, qz]``."""
+
+    def request_pose_state(self, timeout: float = 1.0) -> str:
+        """Request one canonical pose sample and return its correlation GUID."""
+
+    def get_pose_state(
+        self,
+        timeout: float = 1.0,
+        max_age: Optional[float] = None,
+        expected_guid: Optional[str] = None,
+    ) -> dict:
+        """Return a canonical pose, optionally waiting for one correlation GUID."""
+
+
+@runtime_checkable
+class BrainCo2Transport(Protocol):
+    """Optional capability for paired BrainCo2 hand command and feedback."""
+
+    def set_brainco2_position(
+        self,
+        left: np.ndarray,
+        right: np.ndarray,
+        command_time: np.ndarray,
+    ) -> str:
+        """Send raw paired 6D positions and return the command GUID."""
+
+    def request_brainco2_state(self) -> str:
+        """Request one paired hand-state sample and return its GUID."""
+
+    def get_brainco2_state(
+        self,
+        timeout: float = 1.0,
+        max_age: Optional[float] = None,
+    ) -> dict:
+        """Return the latest validated 12D left/right hand state."""
+
+    def raise_brainco2_fault(self) -> None:
+        """Raise a previously recorded asynchronous command failure."""
+
+
+@runtime_checkable
+class BrainCo2SessionRecoveryTransport(Protocol):
+    """Optional recovery gate for commands whose ACK was lost with a session."""
+
+    def clear_brainco2_session_uncertainty(self, generation: int) -> None:
+        """Clear only session uncertainty after fresh state from ``generation``."""
 
 
 @runtime_checkable
@@ -38,7 +142,11 @@ class RobotTransport(Protocol):
         the wrong shape.
         """
 
-    def get_joint_state(self, timeout: float = 1.0) -> dict:
+    def get_joint_state(
+        self,
+        timeout: float = 1.0,
+        max_age: Optional[float] = None,
+    ) -> dict:
         """Return the latest 18-dim state.
 
         Shape::

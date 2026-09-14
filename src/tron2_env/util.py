@@ -18,11 +18,14 @@ class RateLimiter:
         self.period = 1.0 / rate_hz
         self.next_tick = time.monotonic()
 
-    def sleep(self) -> None:
+    def sleep(self, interrupt=None) -> None:
         now = time.monotonic()
         delay = self.next_tick - now
         if delay > 0:
-            time.sleep(delay)
+            if interrupt is None:
+                time.sleep(delay)
+            else:
+                interrupt.wait(delay)
         self.next_tick += self.period
         if self.next_tick < time.monotonic():
             self.next_tick = time.monotonic() + self.period

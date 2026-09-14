@@ -16,6 +16,7 @@ transport 路径已主动排除，不在本次开源范围内。
 - `Tron2Env`：面向 policy 执行的 gym-style 运行时封装。
 - `BridgeObservationProvider`：通过 TRON2 Bridge 获取图像和状态。
 - `MultiCameraManager`：legacy 本机 RealSense 相机观测。
+- 显式物理布局：支持 ServoJ/ServoP、夹爪/BrainCo2 双灵巧手、头部、底盘和升降台。
 - `ActionQueue` 和 `LatencyTracker`：RTC 辅助工具。
 - `examples/replay_data.py`：通过 runtime controller 回放录制动作。
 - 关节索引工具和包级异常类型。
@@ -166,6 +167,39 @@ python examples/replay_data.py \
 `EnvConfig` 由 `Tron2Env` 和 TRON2 客户端使用，用于选择观测模式、action 播放频率、
 调试记录、Bridge 设置和相机设置。推荐值可以参考
 `tron2_openpi/configs/deploy/` 中的公开部署模板。
+
+### 模块化物理布局
+
+`RobotModules` 统一选择双臂模式、双侧末端执行器、头部和移动底盘；
+`PhysicalLayout` 按固定顺序将模块展开为 policy state/action 向量。ServoJ 与 ServoP
+每条手臂都占 7 维，夹爪每侧占 1 维，BrainCo2 每侧占 6 维，头部占 2 维，
+底盘/升降台占 3 维。
+
+| 模块组合 | 物理维度 |
+| --- | ---: |
+| ServoJ/ServoP + 双夹爪 | 16 |
+| ServoJ/ServoP + 双夹爪 + 头部 | 18 |
+| ServoJ/ServoP + 双夹爪 + 底盘/升降台 | 19 |
+| ServoJ/ServoP + 双夹爪 + 头部 + 底盘/升降台 | 21 |
+| ServoJ/ServoP + BrainCo2 双灵巧手 | 26 |
+| ServoJ/ServoP + BrainCo2 双灵巧手 + 头部 | 28 |
+| ServoJ/ServoP + BrainCo2 双灵巧手 + 底盘/升降台 | 29 |
+| ServoJ/ServoP + BrainCo2 双灵巧手 + 头部 + 底盘/升降台 | 31 |
+
+兼容旧配置时，只写 `state_dim: 16` 或 `18` 仍可解析；其他维度必须通过
+`RobotModules` 或显式 `state_layout` 给出物理语义。使用 `RobotModules` 时，
+`state_dim` 和 `state_layout` 如有填写，必须与推导结果完全一致。
+
+模块化真机配置还需遵守以下限制：
+
+- ServoP 每臂表示 `[x, y, z, qw, qx, qy, qz]`，四元数不能线性插值或混合。
+- BrainCo2 必须提供有效的 `BrainCo2Config.command_time`，双手使用同一种末端执行器。
+- Bridge 提供图像时，ServoP 和 BrainCo2 的物理状态必须从机器人 WebSocket 读取。
+- 启用升降台控制时必须使用毫米位置状态；原始关节量仅支持观测。
+- 公开包只支持 WebSocket 控制后端。
+
+部署 YAML 的完整示例见同级 `tron2_openpi` 仓库中的
+`configs/deploy/tron2_deploy.client.example_CN.yaml`。
 
 ## 观测模式
 

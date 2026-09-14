@@ -1,10 +1,12 @@
-"""Tron2 dual-arm robot control + environment library.
+"""Tron2 modular dual-arm robot control + environment library.
 
 Top-level layout:
 
+  * ``layout.py``      — physical layouts and robot module selection
   * ``transport/``     — single-shot send/recv primitives (WebSocket JSON)
-  * ``interpolation/`` — pure-math joint trajectory interpolation
-  * ``motion/``        — MotionController = transport + interpolator + publish loop
+  * ``interpolation/`` — joint and Cartesian-pose interpolation
+  * ``motion/``        — fixed ServoJ/ServoP controller + publish loop
+  * ``end_effector/``  — robot-wide gripper/hand providers
   * ``env.py``         — Tron2Env (gym-style env on top of MotionController)
   * ``bridge.py``      — Bridge ws observation provider
   * ``camera.py``      — RealSense multi-camera manager
@@ -26,8 +28,9 @@ from tron2_env.errors import (
     StateError,
     Tron2Error,
 )
-from tron2_env.interpolation import JointInterpolator, LinearInterpolator
+from tron2_env.interpolation import JointInterpolator, LinearInterpolator, PoseInterpolator
 from tron2_env.joints import JointIndex
+from tron2_env.layout import BrainCo2Config, PhysicalLayout, RobotModules
 from tron2_env.motion import MotionController, create_motion_controller
 from tron2_env.transport import RobotTransport, WebsocketTransport
 
@@ -45,9 +48,13 @@ __all__ = [
     # interpolation
     "JointInterpolator",
     "LinearInterpolator",
+    "PoseInterpolator",
     # motion
     "MotionController",
     "create_motion_controller",
+    "PhysicalLayout",
+    "RobotModules",
+    "BrainCo2Config",
     # env
     "Tron2Env",
     "EnvConfig",

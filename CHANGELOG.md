@@ -13,6 +13,12 @@ and this project intends to use [Semantic Versioning](https://semver.org/).
 - Issue and pull-request templates with robot-safety and sensitive-data checks.
 - Software-only CI for supported Python versions.
 - A no-hardware mock transport Quick Start.
+- Explicit physical layouts for ServoJ/ServoP arms, gripper/BrainCo2 paired
+  hands, head, chassis, and lifter combinations from 16D to 31D.
+- BrainCo2 provider registration, state polling, command acknowledgement, and
+  reconnect recovery for the WebSocket transport.
+- Head command scheduling and chassis/lifter state and command support.
+- Pose interpolation for ServoP and asynchronous debug-image writing.
 
 ### Changed
 
@@ -27,6 +33,8 @@ and this project intends to use [Semantic Versioning](https://semver.org/).
   security contact.
 - Documented the supported network trust boundary for robot control, Bridge
   observations, and OpenPI policy communication.
+- Added state freshness checks, command watchdogs, safe pause/resume behavior,
+  disconnect cleanup, and gripper command clamping for modular execution.
 
 ### Known limitations
 

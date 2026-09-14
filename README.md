@@ -17,6 +17,8 @@ undeveloped low-level transport path is intentionally not included.
 - `Tron2Env`: a gym-style runtime wrapper for policy execution.
 - `BridgeObservationProvider`: image and state observation support through TRON2 Bridge.
 - `MultiCameraManager`: legacy local RealSense camera observation support.
+- Explicit physical layouts for ServoJ/ServoP, gripper/BrainCo2 paired hands,
+  head, chassis, and lifter modules.
 - `ActionQueue` and `LatencyTracker`: RTC helper utilities.
 - `examples/replay_data.py`: recorded-action replay through the runtime controller.
 - Joint index helpers and package-level exceptions.
@@ -171,6 +173,46 @@ initial pose, and workspace safety.
 mode, action playback rate, debug recording, bridge settings, and camera
 settings. The public deployment templates in `tron2_openpi/configs/deploy/`
 show the recommended values.
+
+### Modular Physical Layouts
+
+`RobotModules` selects one arm mode, one paired end-effector type, the head, and
+the mobile base. `PhysicalLayout` then flattens those modules into the policy
+state/action vector in a fixed order. ServoJ and ServoP each use seven values
+per arm, a gripper uses one value per side, BrainCo2 uses six values per side,
+the head uses two values, and the chassis/lifter group uses three values.
+
+| Module combination | Physical dimension |
+| --- | ---: |
+| ServoJ/ServoP + paired grippers | 16 |
+| ServoJ/ServoP + paired grippers + head | 18 |
+| ServoJ/ServoP + paired grippers + chassis/lifter | 19 |
+| ServoJ/ServoP + paired grippers + head + chassis/lifter | 21 |
+| ServoJ/ServoP + paired BrainCo2 hands | 26 |
+| ServoJ/ServoP + paired BrainCo2 hands + head | 28 |
+| ServoJ/ServoP + paired BrainCo2 hands + chassis/lifter | 29 |
+| ServoJ/ServoP + paired BrainCo2 hands + head + chassis/lifter | 31 |
+
+Legacy configs that specify only `state_dim: 16` or `18` remain supported.
+Other dimensions require `RobotModules` or an explicit `state_layout` so the
+runtime does not guess physical semantics from vector width. When
+`RobotModules` is used, any supplied `state_dim` and `state_layout` must exactly
+match the derived layout.
+
+Modular real-robot configurations also have these constraints:
+
+- ServoP represents each arm as `[x, y, z, qw, qx, qy, qz]`; quaternion values
+  must not be linearly interpolated or blended.
+- BrainCo2 requires a valid `BrainCo2Config.command_time`, and both arms use
+  the same end-effector type.
+- When Bridge supplies images, ServoP and BrainCo2 physical state must come
+  from the robot WebSocket.
+- Lifter control requires millimetre position state; raw joint values are
+  observation-only.
+- The public package supports the WebSocket control backend only.
+
+See `configs/deploy/tron2_deploy.client.example.yaml` in the sibling
+`tron2_openpi` repository for a complete deployment YAML example.
 
 ## Observation Modes
 
