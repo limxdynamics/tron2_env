@@ -51,7 +51,7 @@ transport 路径已主动排除，不在本次开源范围内。
 作为独立 editable 包安装：
 
 ```bash
-git clone https://github.com/limx-tron2/tron2_env.git
+git clone https://github.com/limxdynamics/tron2_env.git
 cd tron2_env
 python -m pip install -e ".[bridge,openpi]"
 ```
@@ -72,7 +72,7 @@ python -m pip install -e ".[bridge,openpi]"
 
 ```bash
 cd ..
-git clone https://github.com/limx-tron2/tron2_openpi.git
+git clone https://github.com/limxdynamics/tron2_openpi.git
 cd tron2_openpi
 uv sync
 ```

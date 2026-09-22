@@ -7,8 +7,12 @@ and this project intends to use [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-22
+
 ### Added
 
+- Initial public-source candidate for TRON2 runtime communication, motion,
+  observations, and RTC helper utilities.
 - Public security-reporting policy.
 - Issue and pull-request templates with robot-safety and sensitive-data checks.
 - Software-only CI for supported Python versions.
@@ -43,10 +47,3 @@ and this project intends to use [Semantic Versioning](https://semver.org/).
 - Real-robot use requires separately approved bring-up, emergency-stop, network,
   and safety procedures.
 - The public runtime currently exposes the WebSocket transport only.
-
-## [0.1.0] - Unreleased
-
-### Added
-
-- Initial public-source candidate for TRON2 runtime communication, motion,
-  observations, and RTC helper utilities.

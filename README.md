@@ -53,7 +53,7 @@ parent-directory/
 Install the runtime as an independent editable package:
 
 ```bash
-git clone https://github.com/limx-tron2/tron2_env.git
+git clone https://github.com/limxdynamics/tron2_env.git
 cd tron2_env
 python -m pip install -e ".[bridge,openpi]"
 ```
@@ -74,7 +74,7 @@ When using this package with the TRON2 OpenPI deployment repository, clone
 
 ```bash
 cd ..
-git clone https://github.com/limx-tron2/tron2_openpi.git
+git clone https://github.com/limxdynamics/tron2_openpi.git
 cd tron2_openpi
 uv sync
 ```

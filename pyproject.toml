@@ -17,6 +17,11 @@ dependencies = [
     "websocket-client>=1.8",
 ]
 
+[project.urls]
+Homepage = "https://github.com/limxdynamics/tron2_env"
+Issues = "https://github.com/limxdynamics/tron2_env/issues"
+Changelog = "https://github.com/limxdynamics/tron2_env/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 bridge = ["websockets>=12"]
 camera = ["pyrealsense2"]
