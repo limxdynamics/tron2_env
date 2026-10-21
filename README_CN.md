@@ -1,12 +1,88 @@
-# tron2_env
+<div align="center">
 
-[English](README.md)
+<img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/banner.png" alt="tron2_env — LimX TRON2 操作任务运行时" width="100%">
+
+[English](https://github.com/limxdynamics/tron2_env/blob/main/README.md) | **中文**
+
+[![PyPI](https://img.shields.io/pypi/v/tron2-env?color=0A7BBB)](https://pypi.org/project/tron2-env/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://pypi.org/project/tron2-env/)
+[![CI](https://github.com/limxdynamics/tron2_env/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/limxdynamics/tron2_env/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/limxdynamics/tron2_env/blob/main/LICENSE)
+
+</div>
 
 `tron2_env` 是 TRON2 OpenPI 部署示例使用的公开 TRON2 运行时包，负责机器人通信、
 运动执行、观测采集和 RTC 辅助逻辑。
 
 当前公开版本只提供 WebSocket 机器人 transport。尚未开发完成的 low-level
 transport 路径已主动排除，不在本次开源范围内。
+
+## 亮点
+
+- **Gym 风格运行时。** `Tron2Env` 通过 `reset()` / `step()` 封装机器人，policy 客户端只需处理观测和动作向量。
+- **平滑的高频运动。** `MotionController` 对每个 policy 目标做插值，并由后台线程发布指令（默认 300 Hz），policy 帧率与控制频率解耦。
+- **模块化硬件布局。** ServoJ 或 ServoP 双臂、夹爪或 BrainCo2 灵巧手、头部、底盘和升降台，组合为显式的 16 至 31 维 state/action 向量。
+- **多相机观测。** 图像和状态可来自 TRON2 Bridge，也可来自本机直连的 RealSense 相机。
+- **Real-Time Chunking 辅助工具。** `ActionQueue` 和 `LatencyTracker` 用于平滑执行分块动作。
+- **无需真机即可测试。** 提供 mock transport Quick Start 和纯软件测试集，任何环境都能运行。
+
+## 架构
+
+```text
+  OpenPI policy server  (tron2_openpi)
+          │  WebSocket
+          ▼
+  Policy client  (tron2_openpi/examples/tron2/pi_client.py)
+  RTC helpers: ActionQueue, LatencyTracker
+          │  reset() / step(action)               ▲  observation
+          ▼                                       │
+  ┌─────────────────────────── tron2_env ─────────┴────────────────────────────┐
+  │  Tron2Env ──► MotionController ──► WebsocketTransport ──► TRON2 robot      │
+  │               interpolation +      WebSocket JSON         controller       │
+  │               publish thread                                               │
+  │                                                                            │
+  │  Tron2Env ◄── BridgeObservationProvider ◄── TRON2 Bridge                   │
+  │           ◄── MultiCameraManager        ◄── local RealSense (legacy)       │
+  └────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 安装
+
+从 PyPI 安装：
+
+```bash
+python -m pip install "tron2-env[bridge,openpi]"
+```
+
+或从源码以 editable 方式安装：
+
+```bash
+git clone https://github.com/limxdynamics/tron2_env.git
+cd tron2_env
+python -m pip install -e ".[bridge,openpi]"
+```
+
+可选 extras：
+| Extra | 用途 |
+| --- | --- |
+| `bridge` | Bridge WebSocket 观测支持。 |
+| `camera` | 通过 `pyrealsense2` 使用本机 RealSense 相机。 |
+| `openpi` | 可选 policy wrapper 使用的图像格式化 helper 依赖。 |
+| `replay` | `examples/replay_data.py` 使用的 parquet 和 YAML 依赖。 |
+| `dev` | 测试运行依赖。 |
+| `all` | Bridge、camera、OpenPI helper 和 replay 依赖。 |
+
+## 无硬件 Quick Start
+
+安装开发依赖并运行 mock transport 示例：
+
+```bash
+python -m pip install -e ".[dev]"
+python examples/mock_quickstart.py
+python -m pytest -q
+```
+
+该示例只使用内存 transport，不会建立网络连接、发现硬件或向真实机器人发送指令。
 
 ## 本包包含什么
 
@@ -28,9 +104,9 @@ transport 路径已主动排除，不在本次开源范围内。
 - 机器人标定、客户配置或本地网络设置。
 - 模型权重、数据集或 policy 训练代码。
 
-## 推荐目录结构
+## 配合 tron2_openpi 使用
 
-请将本包和 `tron2_openpi` 放在同级：
+进行 policy 部署时，请将本包和 [`tron2_openpi`](https://github.com/limxdynamics/tron2_openpi) 放在同级：
 
 ```text
 同级目录/
@@ -46,29 +122,7 @@ transport 路径已主动排除，不在本次开源范围内。
 `tron2_openpi/examples/tron2/pi_client.py` 会把 `../tron2_env/src` 加入
 `sys.path`，因此本地开发时可以直接导入 `tron2_env`。
 
-## 依赖安装
-
-作为独立 editable 包安装：
-
-```bash
-git clone https://github.com/limxdynamics/tron2_env.git
-cd tron2_env
-python -m pip install -e ".[bridge,openpi]"
-```
-
-可选 extras：
-
-| Extra | 用途 |
-| --- | --- |
-| `bridge` | Bridge WebSocket 观测支持。 |
-| `camera` | 通过 `pyrealsense2` 使用本机 RealSense 相机。 |
-| `openpi` | 可选 policy wrapper 使用的图像格式化 helper 依赖。 |
-| `replay` | `examples/replay_data.py` 使用的 parquet 和 YAML 依赖。 |
-| `dev` | 测试运行依赖。 |
-| `all` | Bridge、camera、OpenPI helper 和 replay 依赖。 |
-
-如果需要配合同级的 TRON2 OpenPI 部署仓库使用，请单独 clone 并安装/sync
-`tron2_openpi`：
+请单独 clone 并安装/sync 同级的 `tron2_openpi`：
 
 ```bash
 cd ..
@@ -77,27 +131,13 @@ cd tron2_openpi
 uv sync
 ```
 
-## 导入检查
-
-从 `tron2_openpi/` 中运行：
+导入检查，从 `tron2_openpi/` 中运行：
 
 ```bash
 PYTHONPATH="$(cd ../tron2_env/src && pwd)" uv run python -c "import tron2_env; print(tron2_env.__file__)"
 ```
 
 输出路径应该指向 `../tron2_env/src/tron2_env/__init__.py`。
-
-## 无硬件 Quick Start
-
-安装开发依赖并运行 mock transport 示例：
-
-```bash
-python -m pip install -e ".[dev]"
-python examples/mock_quickstart.py
-python -m pytest -q
-```
-
-该示例只使用内存 transport，不会建立网络连接、发现硬件或向真实机器人发送指令。
 
 ## 真机用法
 
@@ -267,6 +307,13 @@ python -m build
 - 如果 legacy 相机缺失，检查 RealSense 权限和相机序列号映射。
 - 如果动作不连续，检查 policy FPS、publish rate、RTC 设置和 checkpoint 中的 action
   归一化统计。
+
+## 相关仓库
+
+| 仓库 | 说明 |
+| --- | --- |
+| [tron2_openpi](https://github.com/limxdynamics/tron2_openpi) | 面向 TRON2 的 OpenPI 衍生仓库：pi0 / pi0.5 策略服务、TRON2 transforms、部署配置和真机客户端。 |
+| [tron2-robot-description](https://github.com/limxdynamics/tron2-robot-description) | TRON2 各型号的 URDF / Xacro、MuJoCo 和 USD 模型。 |
 
 ## 第三方来源
 

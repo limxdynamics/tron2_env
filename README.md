@@ -1,6 +1,15 @@
-# English | [中文](README_CN.md)
+<div align="center">
 
-# tron2_env
+<img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/banner.png" alt="tron2_env — runtime for LimX TRON2 manipulation" width="100%">
+
+**English** | [中文](https://github.com/limxdynamics/tron2_env/blob/main/README_CN.md)
+
+[![PyPI](https://img.shields.io/pypi/v/tron2-env?color=0A7BBB)](https://pypi.org/project/tron2-env/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://pypi.org/project/tron2-env/)
+[![CI](https://github.com/limxdynamics/tron2_env/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/limxdynamics/tron2_env/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/limxdynamics/tron2_env/blob/main/LICENSE)
+
+</div>
 
 `tron2_env` is the public TRON2 runtime package used by the TRON2 OpenPI
 deployment example. It provides robot communication, motion execution,
@@ -8,6 +17,75 @@ observation collection, and RTC helper utilities for real-robot deployment.
 
 The public version currently exposes the WebSocket robot transport only. The
 undeveloped low-level transport path is intentionally not included.
+
+## Highlights
+
+- **Gym-style runtime.** `Tron2Env` wraps the robot behind `reset()` / `step()` so a policy client only deals in observation and action vectors.
+- **Smooth, high-rate motion.** `MotionController` interpolates each policy target and publishes commands from a background thread (300 Hz by default), so policy FPS and control rate stay decoupled.
+- **Modular hardware layouts.** ServoJ or ServoP arms, grippers or BrainCo2 hands, head, chassis and lifter are composed into explicit 16D to 31D state/action vectors.
+- **Multi-camera observation.** Images and state come from TRON2 Bridge, or from locally attached RealSense cameras.
+- **Real-Time Chunking helpers.** `ActionQueue` and `LatencyTracker` for smooth chunked-action execution.
+- **Testable without a robot.** A mock-transport Quick Start and a software-only test suite run anywhere.
+
+## Architecture
+
+```text
+  OpenPI policy server  (tron2_openpi)
+          │  WebSocket
+          ▼
+  Policy client  (tron2_openpi/examples/tron2/pi_client.py)
+  RTC helpers: ActionQueue, LatencyTracker
+          │  reset() / step(action)               ▲  observation
+          ▼                                       │
+  ┌─────────────────────────── tron2_env ─────────┴────────────────────────────┐
+  │  Tron2Env ──► MotionController ──► WebsocketTransport ──► TRON2 robot      │
+  │               interpolation +      WebSocket JSON         controller       │
+  │               publish thread                                               │
+  │                                                                            │
+  │  Tron2Env ◄── BridgeObservationProvider ◄── TRON2 Bridge                   │
+  │           ◄── MultiCameraManager        ◄── local RealSense (legacy)       │
+  └────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Installation
+
+From PyPI:
+
+```bash
+python -m pip install "tron2-env[bridge,openpi]"
+```
+
+Or from source as an editable package:
+
+```bash
+git clone https://github.com/limxdynamics/tron2_env.git
+cd tron2_env
+python -m pip install -e ".[bridge,openpi]"
+```
+
+Optional extras:
+
+| Extra | Purpose |
+| --- | --- |
+| `bridge` | WebSocket bridge observation support. |
+| `camera` | Local RealSense camera support through `pyrealsense2`. |
+| `openpi` | Image formatting helper dependency used by the optional policy wrapper. |
+| `replay` | Parquet and YAML dependencies for `examples/replay_data.py`. |
+| `dev` | Test runner dependencies. |
+| `all` | Bridge, camera, OpenPI helper, and replay dependencies. |
+
+## No-Hardware Quick Start
+
+Install the development dependencies and run the mock transport example:
+
+```bash
+python -m pip install -e ".[dev]"
+python examples/mock_quickstart.py
+python -m pytest -q
+```
+
+The example uses an in-memory transport. It does not open a network connection,
+discover hardware, or send commands to a real robot.
 
 ## What This Package Provides
 
@@ -30,9 +108,10 @@ undeveloped low-level transport path is intentionally not included.
 - Robot-specific calibration, customer profiles, or local network settings.
 - Model weights, datasets, or policy training code.
 
-## Expected Layout
+## Using with tron2_openpi
 
-Keep this package next to `tron2_openpi`:
+For policy deployment, keep this package next to
+[`tron2_openpi`](https://github.com/limxdynamics/tron2_openpi):
 
 ```text
 parent-directory/
@@ -48,29 +127,7 @@ parent-directory/
 `tron2_openpi/examples/tron2/pi_client.py` adds `../tron2_env/src` to
 `sys.path`, so it can import `tron2_env` directly during local development.
 
-## Dependencies
-
-Install the runtime as an independent editable package:
-
-```bash
-git clone https://github.com/limxdynamics/tron2_env.git
-cd tron2_env
-python -m pip install -e ".[bridge,openpi]"
-```
-
-Optional extras:
-
-| Extra | Purpose |
-| --- | --- |
-| `bridge` | WebSocket bridge observation support. |
-| `camera` | Local RealSense camera support through `pyrealsense2`. |
-| `openpi` | Image formatting helper dependency used by the optional policy wrapper. |
-| `replay` | Parquet and YAML dependencies for `examples/replay_data.py`. |
-| `dev` | Test runner dependencies. |
-| `all` | Bridge, camera, OpenPI helper, and replay dependencies. |
-
-When using this package with the TRON2 OpenPI deployment repository, clone
-`tron2_openpi` as a sibling and install/sync it separately:
+Clone `tron2_openpi` as a sibling and install/sync it separately:
 
 ```bash
 cd ..
@@ -79,28 +136,13 @@ cd tron2_openpi
 uv sync
 ```
 
-## Import Check
-
-From `tron2_openpi/`:
+Import check, from `tron2_openpi/`:
 
 ```bash
 PYTHONPATH="$(cd ../tron2_env/src && pwd)" uv run python -c "import tron2_env; print(tron2_env.__file__)"
 ```
 
 The printed path should point to `../tron2_env/src/tron2_env/__init__.py`.
-
-## No-Hardware Quick Start
-
-Install the development dependencies and run the mock transport example:
-
-```bash
-python -m pip install -e ".[dev]"
-python examples/mock_quickstart.py
-python -m pytest -q
-```
-
-The example uses an in-memory transport. It does not open a network connection,
-discover hardware, or send commands to a real robot.
 
 ## Real-Robot Usage
 
@@ -290,6 +332,13 @@ vulnerability reporting instructions.
   mappings.
 - If actions look discontinuous, check policy FPS, publish rate, RTC settings,
   and action normalization stats in the policy checkpoint.
+
+## Related Repositories
+
+| Repository | Description |
+| --- | --- |
+| [tron2_openpi](https://github.com/limxdynamics/tron2_openpi) | OpenPI derivative for TRON2: pi0 / pi0.5 policy serving, TRON2 transforms, deployment configs and robot clients. |
+| [tron2-robot-description](https://github.com/limxdynamics/tron2-robot-description) | URDF / Xacro, MuJoCo and USD models for TRON2 variants. |
 
 ## Third-Party Origins
 
