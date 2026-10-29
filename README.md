@@ -15,8 +15,8 @@
 deployment example. It provides robot communication, motion execution,
 observation collection, and RTC helper utilities for real-robot deployment.
 
-The public version currently exposes the WebSocket robot transport only. The
-undeveloped low-level transport path is intentionally not included.
+Only the WebSocket robot transport is exposed; the low-level path is not part of
+this release.
 
 ## Highlights
 
@@ -34,15 +34,14 @@ undeveloped low-level transport path is intentionally not included.
 </p>
 
 `Tron2Env` reads observations through `BridgeObservationProvider` (TRON2 Bridge)
-or `MultiCameraManager` (local RealSense, legacy), and sends every policy target
-through `MotionController` into `WebsocketTransport` as WebSocket JSON.
+or `MultiCameraManager` (local RealSense, legacy), and sends each policy target
+through `MotionController` to `WebsocketTransport` as WebSocket JSON. Each target
+is interpolated over `eta = 1/fps` on a background thread, so the policy can step
+at any rate while the arm still receives commands at `publish_rate`.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/timing.png" alt="Timing: each policy target is interpolated over eta = 1/fps while a background thread publishes at 300 Hz" width="100%">
 </p>
-
-The two rates are independent: the policy can step at whatever rate the model
-needs, and the arm still receives commands at `publish_rate` (300 Hz by default).
 
 ## Installation
 
@@ -84,26 +83,16 @@ python -m pytest -q
 The example uses an in-memory transport. It does not open a network connection,
 discover hardware, or send commands to a real robot.
 
-## What This Package Provides
+## Scope
 
-- `Tron2Config`: robot connection and bring-up configuration.
-- `WebsocketTransport`: WebSocket JSON transport for TRON2 robot state and commands.
-- `MotionController`: interpolation plus high-rate command publishing.
-- `Tron2Env`: a gym-style runtime wrapper for policy execution.
-- `BridgeObservationProvider`: image and state observation support through TRON2 Bridge.
-- `MultiCameraManager`: legacy local RealSense camera observation support.
-- Explicit physical layouts for ServoJ/ServoP, gripper/BrainCo2 paired hands,
-  head, chassis, and lifter modules.
-- `ActionQueue` and `LatencyTracker`: RTC helper utilities.
-- `examples/replay_data.py`: recorded-action replay through the runtime controller.
-- Joint index helpers and package-level exceptions.
+The public package covers the runtime layer of a deployment: `Tron2Env` and
+`Tron2Config` for the robot loop, `WebsocketTransport` and `MotionController` for
+command delivery, `BridgeObservationProvider` and the legacy `MultiCameraManager`
+for observation, explicit layout objects for arms, hands, head and chassis, and
+`ActionQueue` / `LatencyTracker` plus joint index helpers for RTC.
 
-## What Is Not Included
-
-- Low-level robot transport.
-- Private robot safety controllers.
-- Robot-specific calibration, customer profiles, or local network settings.
-- Model weights, datasets, or policy training code.
+Not included: low-level robot transport, private robot safety controllers, robot
+calibration or customer profiles, and model weights, datasets or training code.
 
 ## Using with tron2_openpi
 
@@ -114,28 +103,19 @@ For policy deployment, keep this package next to
 parent-directory/
 ├── tron2_openpi/
 └── tron2_env/
-    ├── examples/
-    ├── pyproject.toml
-    ├── src/
-    │   └── tron2_env/
-    └── tests/
 ```
 
 `tron2_openpi/examples/tron2/pi_client.py` adds `../tron2_env/src` to
 `sys.path`, so it can import `tron2_env` directly during local development.
 
-Clone `tron2_openpi` as a sibling and install/sync it separately:
+Clone `tron2_openpi` as a sibling, sync it and check the import resolves back to
+this checkout:
 
 ```bash
 cd ..
 git clone https://github.com/limxdynamics/tron2_openpi.git
 cd tron2_openpi
 uv sync
-```
-
-Import check, from `tron2_openpi/`:
-
-```bash
 PYTHONPATH="$(cd ../tron2_env/src && pwd)" uv run python -c "import tron2_env; print(tron2_env.__file__)"
 ```
 
@@ -179,7 +159,8 @@ the policy client, `Tron2Env`, observations, and action playback together.
 `tron2_env`. It uses the deployment YAML from the sibling `tron2_openpi`
 repository for robot IP, initialization pose, backend, and playback rate.
 
-Always dry-run first:
+Always dry-run first, and drop `--dry-run` only after confirming the file, replay
+range, robot address, initial pose and workspace safety:
 
 ```bash
 python -m pip install -e ".[replay]"
@@ -189,9 +170,6 @@ python examples/replay_data.py \
   --data-key action \
   --dry-run
 ```
-
-Remove `--dry-run` only after confirming the file, replay range, robot address,
-initial pose, and workspace safety.
 
 ## Configuration Concepts
 
@@ -215,11 +193,9 @@ show the recommended values.
 
 ### Modular Physical Layouts
 
-`RobotModules` selects one arm mode, one paired end-effector type, the head, and
-the mobile base. `PhysicalLayout` then flattens those modules into the policy
-state/action vector in a fixed order. ServoJ and ServoP each use seven values
-per arm, a gripper uses one value per side, BrainCo2 uses six values per side,
-the head uses two values, and the chassis/lifter group uses three values.
+`RobotModules` selects one arm mode, one paired end-effector type, the head and
+the mobile base; `PhysicalLayout` flattens them into the policy state/action
+vector in a fixed order.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/state-action-layout.png" alt="State and action vector layout: 7 arm + 1 gripper + 7 arm + 1 gripper = 16; six-value BrainCo2 hands bring it to 26; head and chassis add 2 and 3 to reach 31" width="100%">
@@ -271,11 +247,7 @@ Legacy RealSense mode:
 - Reads robot state from the WebSocket robot transport.
 - Requires camera serial numbers to be mapped to policy camera names.
 
-The policy image names are:
-
-- `cam_high`
-- `cam_left_wrist`
-- `cam_right_wrist`
+The policy image names are `cam_high`, `cam_left_wrist` and `cam_right_wrist`.
 
 ## Safety Notes
 
@@ -308,18 +280,15 @@ The policy image names are:
 
 ## Development Checks
 
-Run the same software-only checks used by CI:
+Beyond the Quick Start, CI also runs:
 
 ```bash
-python -m pip install -e ".[dev]"
 python -m compileall -q src tests examples
-python -m pytest -q
-python examples/mock_quickstart.py
 python -m build
 ```
 
-See `CONTRIBUTING.md` for contribution boundaries and `SECURITY.md` for private
-vulnerability reporting instructions.
+See `.github/workflows/ci.yml` for the exact job, `CONTRIBUTING.md` for
+contribution boundaries and `SECURITY.md` for private vulnerability reporting.
 
 ## Troubleshooting
 

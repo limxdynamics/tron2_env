@@ -14,8 +14,7 @@
 `tron2_env` 是 TRON2 OpenPI 部署示例使用的公开 TRON2 运行时包，负责机器人通信、
 运动执行、观测采集和 RTC 辅助逻辑。
 
-当前公开版本只提供 WebSocket 机器人 transport。尚未开发完成的 low-level
-transport 路径已主动排除，不在本次开源范围内。
+公开版本只提供 WebSocket 机器人 transport，尚未完成的 low-level 路径不在本次开源范围内。
 
 ## 亮点
 
@@ -34,14 +33,13 @@ transport 路径已主动排除，不在本次开源范围内。
 
 `Tron2Env` 通过 `BridgeObservationProvider`（TRON2 Bridge）或
 `MultiCameraManager`（本地 RealSense，legacy）读取观测，并把每个策略目标经
-`MotionController` 交给 `WebsocketTransport`，以 WebSocket JSON 下发。
+`MotionController` 交给 `WebsocketTransport`，以 WebSocket JSON 下发。每个目标在
+后台线程按 `eta = 1/fps` 插值，因此策略可按任意频率运行，机械臂仍按
+`publish_rate` 收到指令。
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/timing-zh.png" alt="时序：每个策略目标在 eta = 1/fps 内被插值，后台线程以 300 Hz 持续下发" width="100%">
 </p>
-
-两个频率互不牵制：策略按模型需要的频率运行，机械臂仍然按 `publish_rate`
-（默认 300 Hz）收到指令。
 
 ## 安装
 
@@ -60,6 +58,7 @@ python -m pip install -e ".[bridge,openpi]"
 ```
 
 可选 extras：
+
 | Extra | 用途 |
 | --- | --- |
 | `bridge` | Bridge WebSocket 观测支持。 |
@@ -81,25 +80,16 @@ python -m pytest -q
 
 该示例只使用内存 transport，不会建立网络连接、发现硬件或向真实机器人发送指令。
 
-## 本包包含什么
+## 范围
 
-- `Tron2Config`：机器人连接和初始化配置。
-- `WebsocketTransport`：用于 TRON2 机器人状态和命令的 WebSocket JSON transport。
-- `MotionController`：插值和高频指令发布。
-- `Tron2Env`：面向 policy 执行的 gym-style 运行时封装。
-- `BridgeObservationProvider`：通过 TRON2 Bridge 获取图像和状态。
-- `MultiCameraManager`：legacy 本机 RealSense 相机观测。
-- 显式物理布局：支持 ServoJ/ServoP、夹爪/BrainCo2 双灵巧手、头部、底盘和升降台。
-- `ActionQueue` 和 `LatencyTracker`：RTC 辅助工具。
-- `examples/replay_data.py`：通过 runtime controller 回放录制动作。
-- 关节索引工具和包级异常类型。
+公开包覆盖一次部署的运行时层：`Tron2Env` 与 `Tron2Config` 负责机器人循环，
+`WebsocketTransport` 与 `MotionController` 负责指令下发，
+`BridgeObservationProvider` 与 legacy 的 `MultiCameraManager` 负责观测，
+显式布局对象负责手臂、灵巧手、头部和底盘，`ActionQueue` / `LatencyTracker`
+与关节索引工具负责 RTC。
 
-## 本包不包含什么
-
-- low-level 机器人 transport。
-- 私有机器人安全控制器。
-- 机器人标定、客户配置或本地网络设置。
-- 模型权重、数据集或 policy 训练代码。
+不包含：low-level 机器人 transport、私有机器人安全控制器、机器人标定与客户配置，
+以及模型权重、数据集和 policy 训练代码。
 
 ## 配合 tron2_openpi 使用
 
@@ -109,28 +99,18 @@ python -m pytest -q
 同级目录/
 ├── tron2_openpi/
 └── tron2_env/
-    ├── examples/
-    ├── pyproject.toml
-    ├── src/
-    │   └── tron2_env/
-    └── tests/
 ```
 
 `tron2_openpi/examples/tron2/pi_client.py` 会把 `../tron2_env/src` 加入
 `sys.path`，因此本地开发时可以直接导入 `tron2_env`。
 
-请单独 clone 并安装/sync 同级的 `tron2_openpi`：
+请单独 clone 同级 `tron2_openpi`、sync 并验证导入指向本仓库：
 
 ```bash
 cd ..
 git clone https://github.com/limxdynamics/tron2_openpi.git
 cd tron2_openpi
 uv sync
-```
-
-导入检查，从 `tron2_openpi/` 中运行：
-
-```bash
 PYTHONPATH="$(cd ../tron2_env/src && pwd)" uv run python -c "import tron2_env; print(tron2_env.__file__)"
 ```
 
@@ -172,7 +152,8 @@ policy client、`Tron2Env`、观测和 action 播放串联好。
 `examples/replay_data.py` 会通过 `tron2_env` 直接回放 parquet 轨迹。它使用同级
 `tron2_openpi` 仓库中的部署 YAML 读取机器人 IP、初始化姿态、backend 和播放频率。
 
-必须先 dry-run：
+必须先 dry-run；只有在确认文件、回放范围、机器人地址、初始化姿态和工作空间安全后，
+才移除 `--dry-run`：
 
 ```bash
 python -m pip install -e ".[replay]"
@@ -182,9 +163,6 @@ python examples/replay_data.py \
   --data-key action \
   --dry-run
 ```
-
-只有在确认文件、回放范围、机器人地址、初始化姿态和工作空间安全后，才移除
-`--dry-run`。
 
 ## 配置概念
 
@@ -208,9 +186,7 @@ python examples/replay_data.py \
 ### 模块化物理布局
 
 `RobotModules` 统一选择双臂模式、双侧末端执行器、头部和移动底盘；
-`PhysicalLayout` 按固定顺序将模块展开为 policy state/action 向量。ServoJ 与 ServoP
-每条手臂都占 7 维，夹爪每侧占 1 维，BrainCo2 每侧占 6 维，头部占 2 维，
-底盘/升降台占 3 维。
+`PhysicalLayout` 按固定顺序将模块展开为 policy state/action 向量。
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/state-action-layout-zh.png" alt="状态与动作向量布局：7 维手臂 + 1 维夹爪 + 7 维手臂 + 1 维夹爪 = 16；BrainCo2 手每侧 6 维到 26；头部 2 维、底盘 3 维，最大 31" width="100%">
@@ -256,11 +232,7 @@ Legacy RealSense 模式：
 - 从 WebSocket 机器人 transport 读取状态。
 - 需要把相机序列号映射到 policy 期望的相机名。
 
-policy 图像名为：
-
-- `cam_high`
-- `cam_left_wrist`
-- `cam_right_wrist`
+policy 图像名为 `cam_high`、`cam_left_wrist` 和 `cam_right_wrist`。
 
 ## 安全注意事项
 
@@ -287,17 +259,15 @@ policy 图像名为：
 
 ## 开发检查
 
-运行与 CI 相同的纯软件检查：
+除 Quick Start 之外，CI 还会运行：
 
 ```bash
-python -m pip install -e ".[dev]"
 python -m compileall -q src tests examples
-python -m pytest -q
-python examples/mock_quickstart.py
 python -m build
 ```
 
-贡献边界见 `CONTRIBUTING.md`，安全漏洞的私密报告方式见 `SECURITY.md`。
+完整任务见 `.github/workflows/ci.yml`；贡献边界见 `CONTRIBUTING.md`，
+安全漏洞的私密报告方式见 `SECURITY.md`。
 
 ## 常见问题
 
