@@ -29,23 +29,20 @@ undeveloped low-level transport path is intentionally not included.
 
 ## Architecture
 
-```text
-  OpenPI policy server  (tron2_openpi)
-          │  WebSocket
-          ▼
-  Policy client  (tron2_openpi/examples/tron2/pi_client.py)
-  RTC helpers: ActionQueue, LatencyTracker
-          │  reset() / step(action)               ▲  observation
-          ▼                                       │
-  ┌─────────────────────────── tron2_env ─────────┴────────────────────────────┐
-  │  Tron2Env ──► MotionController ──► WebsocketTransport ──► TRON2 robot      │
-  │               interpolation +      WebSocket JSON         controller       │
-  │               publish thread                                               │
-  │                                                                            │
-  │  Tron2Env ◄── BridgeObservationProvider ◄── TRON2 Bridge                   │
-  │           ◄── MultiCameraManager        ◄── local RealSense (legacy)       │
-  └────────────────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/architecture.png" alt="tron2_env architecture: policy client calls reset/step on Tron2Env, which drives MotionController and WebsocketTransport towards the TRON2 robot, and reads observations back from TRON2 Bridge" width="100%">
+</p>
+
+`Tron2Env` reads observations through `BridgeObservationProvider` (TRON2 Bridge)
+or `MultiCameraManager` (local RealSense, legacy), and sends every policy target
+through `MotionController` into `WebsocketTransport` as WebSocket JSON.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/timing.png" alt="Timing: each policy target is interpolated over eta = 1/fps while a background thread publishes at 300 Hz" width="100%">
+</p>
+
+The two rates are independent: the policy can step at whatever rate the model
+needs, and the arm still receives commands at `publish_rate` (300 Hz by default).
 
 ## Installation
 
@@ -223,6 +220,10 @@ the mobile base. `PhysicalLayout` then flattens those modules into the policy
 state/action vector in a fixed order. ServoJ and ServoP each use seven values
 per arm, a gripper uses one value per side, BrainCo2 uses six values per side,
 the head uses two values, and the chassis/lifter group uses three values.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/state-action-layout.png" alt="State and action vector layout: 7 arm + 1 gripper + 7 arm + 1 gripper = 16; six-value BrainCo2 hands bring it to 26; head and chassis add 2 and 3 to reach 31" width="100%">
+</p>
 
 | Module combination | Physical dimension |
 | --- | ---: |

@@ -28,23 +28,20 @@ transport 路径已主动排除，不在本次开源范围内。
 
 ## 架构
 
-```text
-  OpenPI policy server  (tron2_openpi)
-          │  WebSocket
-          ▼
-  Policy client  (tron2_openpi/examples/tron2/pi_client.py)
-  RTC helpers: ActionQueue, LatencyTracker
-          │  reset() / step(action)               ▲  observation
-          ▼                                       │
-  ┌─────────────────────────── tron2_env ─────────┴────────────────────────────┐
-  │  Tron2Env ──► MotionController ──► WebsocketTransport ──► TRON2 robot      │
-  │               interpolation +      WebSocket JSON         controller       │
-  │               publish thread                                               │
-  │                                                                            │
-  │  Tron2Env ◄── BridgeObservationProvider ◄── TRON2 Bridge                   │
-  │           ◄── MultiCameraManager        ◄── local RealSense (legacy)       │
-  └────────────────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/architecture-zh.png" alt="tron2_env 架构：策略客户端通过 reset/step 调用 Tron2Env，后者经 MotionController 与 WebsocketTransport 驱动 TRON2 机器人，并从 TRON2 Bridge 读回观测" width="100%">
+</p>
+
+`Tron2Env` 通过 `BridgeObservationProvider`（TRON2 Bridge）或
+`MultiCameraManager`（本地 RealSense，legacy）读取观测，并把每个策略目标经
+`MotionController` 交给 `WebsocketTransport`，以 WebSocket JSON 下发。
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/timing-zh.png" alt="时序：每个策略目标在 eta = 1/fps 内被插值，后台线程以 300 Hz 持续下发" width="100%">
+</p>
+
+两个频率互不牵制：策略按模型需要的频率运行，机械臂仍然按 `publish_rate`
+（默认 300 Hz）收到指令。
 
 ## 安装
 
@@ -214,6 +211,10 @@ python examples/replay_data.py \
 `PhysicalLayout` 按固定顺序将模块展开为 policy state/action 向量。ServoJ 与 ServoP
 每条手臂都占 7 维，夹爪每侧占 1 维，BrainCo2 每侧占 6 维，头部占 2 维，
 底盘/升降台占 3 维。
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/limxdynamics/tron2_env/main/docs/images/state-action-layout-zh.png" alt="状态与动作向量布局：7 维手臂 + 1 维夹爪 + 7 维手臂 + 1 维夹爪 = 16；BrainCo2 手每侧 6 维到 26；头部 2 维、底盘 3 维，最大 31" width="100%">
+</p>
 
 | 模块组合 | 物理维度 |
 | --- | ---: |
