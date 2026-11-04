@@ -11,6 +11,8 @@
 
 </div>
 
+> **Part of the TRON2 open-source ecosystem.** Where to start and the other TRON2 repositories: [TRON2 quick start](https://github.com/limxdynamics/limxdynamics/blob/main/doc/quickstart.md#tron2).
+
 `tron2_env` is the public TRON2 runtime package used by the TRON2 OpenPI
 deployment example. It provides robot communication, motion execution,
 observation collection, and RTC helper utilities for real-robot deployment.

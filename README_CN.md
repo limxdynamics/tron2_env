@@ -11,6 +11,8 @@
 
 </div>
 
+> **TRON2 开源生态的一部分。** 上手路线和其他 TRON2 仓库：[TRON2 快速上手](https://github.com/limxdynamics/limxdynamics/blob/main/doc/quickstart_cn.md#tron2)。
+
 `tron2_env` 是 TRON2 OpenPI 部署示例使用的公开 TRON2 运行时包，负责机器人通信、
 运动执行、观测采集和 RTC 辅助逻辑。
 
